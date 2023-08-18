@@ -18,6 +18,7 @@
 #include "sql_parse.h"                       // check_access
 #include "sql_table.h"                       // mysql_alter_table,
                                              // mysql_exchange_partition
+#include "sql_statistics.h"                  // delete_statistics_for_column
 #include "sql_alter.h"
 #include "wsrep_mysqld.h"
 
@@ -294,6 +295,53 @@ uint Alter_info::check_vcol_field(Item_field *item) const
       return cf.vcol_info ? cf.vcol_info->flags : 0;
   }
   return 0;
+}
+
+
+bool Alter_info::collect_renamed_fields(THD *thd)
+{
+  List_iterator_fast<Create_field> new_field_it;
+  Create_field *new_field;
+  DBUG_ENTER("Alter_info::collect_renamed_fields");
+
+  new_field_it.init(create_list);
+  while ((new_field= new_field_it++))
+  {
+    Field *field= new_field->field;
+
+    if (new_field->field &&
+        cmp(&field->field_name, &new_field->field_name))
+    {
+      field->flags|= FIELD_IS_RENAMED;
+      if (add_stat_rename_field(field,
+                                &new_field->field_name,
+                                thd->mem_root))
+        DBUG_RETURN(true);
+
+    }
+  }
+  DBUG_RETURN(false);
+}
+
+
+void Alter_info::apply_statistics_deletes_renames(THD *thd, TABLE *table)
+{
+  List_iterator<Field>                     it_drop_field(drop_stat_fields);
+  List_iterator<RENAME_COLUMN_STAT_PARAMS> it_rename_field(rename_stat_fields);
+  List_iterator<DROP_INDEX_STAT_PARAMS>    it_drop_index(drop_stat_indexes);
+  List_iterator<RENAME_INDEX_STAT_PARAMS>  it_rename_index(rename_stat_indexes);
+
+  while (Field *field= it_drop_field++)
+    delete_statistics_for_column(thd, table, field);
+
+  if (!rename_stat_fields.is_empty())
+    (void) rename_columns_in_stat_table(thd, table, &rename_stat_fields);
+
+  while (DROP_INDEX_STAT_PARAMS *key= it_drop_index++)
+    (void) delete_statistics_for_index(thd, table, key->key, key->flag);
+
+  if (!rename_stat_indexes.is_empty())
+    (void) rename_indexes_in_stat_table(thd, table, &rename_stat_indexes);
 }
 
 
