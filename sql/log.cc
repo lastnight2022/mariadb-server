@@ -8615,7 +8615,7 @@ MYSQL_BIN_LOG::trx_group_commit_leader(group_commit_entry *leader)
       if (likely(gtid_index))
       {
         rpl_gtid gtid= current->thd->get_last_commit_gtid();
-        gtid_index->process_gtid(commit_offset, &gtid);
+        gtid_index->process_gtid((uint32)commit_offset, &gtid);
       }
       cache_mngr->last_commit_pos_offset= commit_offset;
       if ((cache_mngr->using_xa && cache_mngr->xa_xid) || current->need_unlog)

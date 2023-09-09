@@ -380,7 +380,7 @@ Gtid_index_writer::write_current_node(uint32 level, bool is_root)
 
   DBUG_ASSERT(node_pos % page_size == 0);
   /* Page numbers are +1 just so that zero can denote invalid page pointer. */
-  return 1 + (node_pos / page_size);
+  return 1 + (node_pos / (uint32)page_size);
 }
 
 
