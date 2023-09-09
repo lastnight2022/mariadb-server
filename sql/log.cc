@@ -4055,7 +4055,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
         if (gtid_index)
           delete gtid_index;
         my_off_t offset= my_b_tell(&log_file);
-        gtid_index= new Gtid_index_writer(log_file_name, offset,
+        gtid_index= new Gtid_index_writer(log_file_name, (uint32)offset,
                                           &rpl_global_gtid_binlog_state);
         if (!gtid_index)
           sql_print_information("Could not create GTID index for binlog "
@@ -7083,7 +7083,7 @@ err:
         if (likely(gtid_index))
         {
           rpl_gtid gtid= thd->get_last_commit_gtid();
-          gtid_index->process_gtid(offset, &gtid);
+          gtid_index->process_gtid((uint32)offset, &gtid);
         }
 
         if ((error= flush_and_sync(&synced)))
