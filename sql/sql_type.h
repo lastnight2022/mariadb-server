@@ -2803,6 +2803,11 @@ class Timestamp_or_zero_datetime: protected Timestamp
 {
   bool m_is_zero_datetime;
 public:
+  static Timestamp_or_zero_datetime zero()
+  {
+    return Timestamp_or_zero_datetime(Timestamp(0, 0), true);
+  }
+public:
   Timestamp_or_zero_datetime()
    :Timestamp(0,0), m_is_zero_datetime(true)
   { }
@@ -2810,7 +2815,7 @@ public:
    :Timestamp(native.length() ? Timestamp(native) : Timestamp(0,0)),
     m_is_zero_datetime(native.length() == 0)
   { }
-  Timestamp_or_zero_datetime(const Timestamp &tm, bool is_zero_datetime)
+  Timestamp_or_zero_datetime(const Timestamp &tm, bool is_zero_datetime= false)
    :Timestamp(tm), m_is_zero_datetime(is_zero_datetime)
   { }
   Timestamp_or_zero_datetime(THD *thd, const MYSQL_TIME *ltime, uint *err_code);
@@ -2833,6 +2838,11 @@ public:
     if (other.is_zero_datetime())
       return 1;
     return Timestamp::cmp(other);
+  }
+  const Timestamp &to_timestamp() const
+  {
+    DBUG_ASSERT(!is_zero_datetime());
+    return *this;
   }
   bool to_TIME(THD *thd, MYSQL_TIME *to, date_mode_t fuzzydate) const;
   /*
@@ -6666,6 +6676,8 @@ public:
   my_decimal *Item_func_min_max_val_decimal(Item_func_min_max *,
                                             my_decimal *) const override;
   bool set_comparator_func(THD *thd, Arg_comparator *cmp) const override;
+  bool Item_const_eq(const Item_const *a, const Item_const *b,
+                     bool binary_cmp) const override;
   bool Item_hybrid_func_fix_attributes(THD *thd,
                                        const LEX_CSTRING &name,
                                        Type_handler_hybrid_field_type *,

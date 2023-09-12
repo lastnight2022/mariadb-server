@@ -1312,6 +1312,8 @@ NULLIF(c_timestamp3,  c_timestamp3),
 NULLIF(c_timestamp3,  c_date),
 NULLIF(c_timestamp3,  c_time)
 FROM t1;
+Warnings:
+Warning	1292	Incorrect datetime value: '1'
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1432,6 +1434,8 @@ NULLIF(1,  c_timestamp3),
 NULLIF(1,  c_date),
 NULLIF(1,  c_time)
 FROM t1;
+Warnings:
+Warning	1292	Incorrect datetime value: '1'
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1471,6 +1475,8 @@ NULLIF(1.0,  c_timestamp3),
 NULLIF(1.0,  c_date),
 NULLIF(1.0,  c_time)
 FROM t1;
+Warnings:
+Warning	1292	Incorrect datetime value: '1.0'
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1510,6 +1516,8 @@ NULLIF(1e0,  c_timestamp3),
 NULLIF(1e0,  c_date),
 NULLIF(1e0,  c_time)
 FROM t1;
+Warnings:
+Warning	1292	Incorrect datetime value: '1'
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
@@ -1549,6 +1557,8 @@ NULLIF('1',  c_timestamp3),
 NULLIF('1',  c_date),
 NULLIF('1',  c_time)
 FROM t1;
+Warnings:
+Warning	1292	Incorrect datetime value: '1'
 SHOW CREATE TABLE t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (

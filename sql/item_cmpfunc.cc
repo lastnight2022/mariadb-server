@@ -411,6 +411,78 @@ void Item_func::convert_const_compared_to_int_field(THD *thd)
 }
 
 
+/*
+  Check if in a predicate like:
+
+     WHERE timestamp_arg=datetime_arg
+
+  we can replace DATETIME comparison to TIMESTAMP comparison,
+  to avoid slow TIMESTAMP->DATETIME data type conversion per row.
+
+  TIMESTAMP and DATETIME are compared as DATETIME historically.
+  This may be inefficient, because involves a conversion of
+  the TIMESTAMP side to DATETIME per row.
+  The conversion happens in Timezone::gmt_sec_to_TIME().
+  E.g. in case of the SYSTEM timezone, it calls localtime_r(),
+  which is known to be slow.
+
+  It's generally not possible to compare TIMESTAMP and DATETIME
+  as TIMESTAMP without behavior change, because:
+  - DATETIME has a wider range.
+  - Two different TIMESTAMP values can have the same DATETIME value
+    near the "fall back" DST change, as well as for leap seconds.
+  - There are DATETIME gaps during the "spring forward" DST switch.
+
+  However, if the DATETIME side is a constant, then we can compare
+  it to TIMESTAMP as TIMESTAMP in many cases. The DATETIME argument can
+  be converted once to TIMESTAMP, so no data type conversion will
+  happen per row. This is faster for big tables.
+
+  The comparison predicates must satisfy the following conditions:
+    1. There must be a proper data type combination:
+       - expr0 must be of the TIMESTAMP data type
+       - expr1 must be of the DATETIME data type,
+         or can convert to DATETIME.
+    2. expr1 must be a constant
+    3. expr1 must convert to TIMESTAMP safely
+       (without time zone anomalies near its value)
+*/
+
+
+static Item* get_timestamp_item_for_comparison(THD *thd,
+                                               Item *expr0,
+                                               Item *expr1)
+{
+  if (expr1->with_sum_func() /* See comment in convert_const_to_int() */ ||
+      !expr1->can_eval_in_optimize() ||
+      !dynamic_cast<const Type_handler_timestamp_common*>(
+                                                 expr0->type_handler()) ||
+      !expr1->type_handler()->can_return_date())
+    return NULL;
+
+  Datetime dt(thd, expr1, Timestamp::DatetimeOptions(thd));
+
+  if (!dt.is_valid_datetime())
+    return NULL; // SQL NULL DATETIME, or a DATETIME with zeros in YYYYMMDD
+
+  // '0000-00-00 00:00:00' is a special valid MariaDB TIMESTAMP value
+  if (!non_zero_date(dt.get_mysql_time()))
+    return new (thd->mem_root) Item_timestamp_literal(thd,
+                                          Timestamp_or_zero_datetime::zero(),
+                                          expr1->datetime_precision(thd));
+
+  const Timeval_null tv(thd->safe_timeval_replacement_for_nonzero_datetime(dt));
+  if (tv.is_null())
+    return NULL; // Time zone anomalies found around "dt"
+
+  // Should be safe to convert
+  const Timestamp_or_zero_datetime ts(Timestamp(tv.to_timeval()));
+  return new (thd->mem_root) Item_timestamp_literal(thd,
+                                          ts,
+                                          expr1->datetime_precision(thd));
+}
+
+
 bool Item_func::setup_args_and_comparator(THD *thd, Arg_comparator *cmp)
 {
   DBUG_ASSERT(arg_count >= 2); // Item_func_nullif has arg_count == 3
@@ -426,6 +498,15 @@ bool Item_func::setup_args_and_comparator(THD *thd, Arg_comparator *cmp)
   //  Convert constants when compared to int/year field
   DBUG_ASSERT(functype() != LIKE_FUNC);
   convert_const_compared_to_int_field(thd);
+
+  if (!thd->lex->is_ps_or_view_context_analysis())
+  {
+    Item *item;
+    if ((item= get_timestamp_item_for_comparison(thd, args[0], args[1])))
+      thd->change_item_tree(&args[1], item);
+    else if ((item= get_timestamp_item_for_comparison(thd, args[1], args[0])))
+      thd->change_item_tree(&args[0], item);
+  }
 
   return cmp->set_cmp_func(thd, this, &args[0], &args[1], true);
 }

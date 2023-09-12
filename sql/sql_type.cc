@@ -8671,6 +8671,16 @@ Type_handler_temporal_result::Item_const_eq(const Item_const *a,
           b->get_type_all_attributes_from_const()->decimals);
 }
 
+
+bool
+Type_handler_timestamp_common::Item_const_eq(const Item_const *a,
+                                             const Item_const *b,
+                                             bool binary_cmp) const
+{
+  return false;
+}
+
+
 /***************************************************************************/
 
 const Type_handler *
