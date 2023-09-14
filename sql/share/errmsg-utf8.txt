@@ -12307,3 +12307,5 @@ ER_CF_DROPPED
 ER_CANT_DROP_CF
         chi "不能删除列族 ('%s')，因为它正在使用或不存在。"
         eng "Cannot drop Column family ('%s') because it is in use or does not exist."
+ER_TOO_MANY_OPEN_CURSORS
+        eng "Too many open cursors; max %u cursors allowed"
