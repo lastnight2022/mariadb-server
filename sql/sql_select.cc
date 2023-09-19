@@ -31389,6 +31389,7 @@ bool JOIN::transform_all_conds_and_on_exprs_in_join_list(
   return false;
 }
 
+Charset_utf8narrow utf8mb3_from_mb4;
 
 /**
   @} (end of group Query_Optimizer)

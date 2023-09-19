@@ -8948,10 +8948,20 @@ SEL_ARG *Field_str::get_mm_leaf(RANGE_OPT_PARAM *prm, KEY_PART *key_part,
                                 const Item_bool_func *cond,
                                 scalar_comparison_op op, Item *value)
 {
+  int err;
   DBUG_ENTER("Field_str::get_mm_leaf");
   if (!can_optimize_scalar_range(prm, key_part, cond, op, value))
     DBUG_RETURN(0);
-  int err= value->save_in_field_no_warnings(this, 1);
+
+  {
+    /* Do CharsetNarrowing if necessary */
+    bool do_narrowing= 
+      Utf8_narrow_RAII::should_do_narrowing(this, value->collation.collation);
+    Utf8_narrow_RAII tmp(this, do_narrowing);
+
+    err= value->save_in_field_no_warnings(this, 1);
+  }
+
   if ((op != SCALAR_CMP_EQUAL && is_real_null()) || err < 0)
     DBUG_RETURN(&null_element);
   if (err > 0)
