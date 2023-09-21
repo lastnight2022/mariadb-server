@@ -7711,7 +7711,10 @@ public:
   Item_equal *find_item_equal(COND_EQUAL *cond_equal)
   { return m_item->find_item_equal(cond_equal); }
   Item *propagate_equal_fields(THD *thd, const Context &ctx, COND_EQUAL *cond)
-  { return m_item->propagate_equal_fields(thd, ctx, cond); }
+  {
+    m_item= m_item->propagate_equal_fields(thd, ctx, cond);
+    return this;
+  }
   Item *replace_equal_field(THD *thd, uchar *arg)
   { return m_item->replace_equal_field(thd, arg); }
 
