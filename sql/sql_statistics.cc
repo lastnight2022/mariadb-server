@@ -289,10 +289,18 @@ static inline int open_stat_table_for_ddl(THD *thd, TABLE_LIST *table,
                                           const LEX_CSTRING *stat_tab_name)
 {
   table->init_one_table(&MYSQL_SCHEMA_NAME, stat_tab_name, NULL, TL_WRITE);
-  No_such_table_error_handler nst_handler;
+  No_such_table_or_lock_error_handler nst_handler;
   thd->push_internal_handler(&nst_handler);
   int res= open_system_tables_for_read(thd, table);
   thd->pop_internal_handler();
+  if (res && nst_handler.got_error())
+  {
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                        ER_CHECK_NO_SUCH_TABLE,
+                        "Got error %d when trying to open statistics "
+                        "table %`s for updating statistics",
+                        nst_handler.got_error(), stat_table_name->str);
+  }
   return res;
 }
 

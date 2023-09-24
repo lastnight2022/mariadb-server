@@ -665,4 +665,22 @@ private:
 };
 
 
+class No_such_table_or_lock_error_handler : public Internal_error_handler
+{
+  uint first_error;
+public:
+  No_such_table_or_lock_error_handler() :
+    first_error(0)
+  {}
+
+  bool handle_condition(THD *thd,
+                        uint sql_errno,
+                        const char* sqlstate,
+                        Sql_condition::enum_warning_level *level,
+                        const char* msg,
+                        Sql_condition ** cond_hdl);
+  uint got_error() { return first_error; }
+};
+
+
 #endif /* SQL_BASE_INCLUDED */
