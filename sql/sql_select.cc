@@ -1311,6 +1311,25 @@ JOIN::prepare(TABLE_LIST *tables_init,
                  &select_lex->hidden_bit_fields))
     DBUG_RETURN(-1);
 
+  /*
+    If we have a derived table
+    AND it is a CTE
+    AND there are supplied names to be later applied to this item_list
+    AND we have the correct number of elements in both lists
+    AND we haven't done this yet
+    THEN NOW is the time to take a copy of these item_names for
+      later restoration if required.
+  */
+  TABLE_LIST *derived= select_lex->master_unit()->derived;
+
+  if (derived &&
+      derived->with &&
+      derived->with->column_list.elements &&
+      (derived->with->column_list.elements == select_lex->item_list.elements) &&
+      !derived->original_names
+      )
+    derived->original_names= allocate_and_save_item_names(thd,
+                                                       select_lex->item_list);
   if (thd->lex->current_select->first_cond_optimization)
   {
     if ( conds && ! thd->lex->current_select->merged_into)

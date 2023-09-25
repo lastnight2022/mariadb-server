@@ -1336,6 +1336,8 @@ bool mysql_derived_reinit(THD *thd, LEX *lex, TABLE_LIST *derived)
                        derived->get_unit()));
   st_select_lex_unit *unit= derived->get_unit();
 
+  if (derived->original_names)
+    unit->first_select()->replace_item_list_names(derived->original_names);
   derived->merged_for_insert= FALSE;
   unit->unclean();
   unit->types.empty();

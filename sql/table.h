@@ -2176,6 +2176,7 @@ struct vers_select_conds_t
 
 struct LEX;
 class Index_hint;
+class Lex_ident_sys;
 
 /*
   @struct TABLE_CHAIN
@@ -2417,9 +2418,14 @@ struct TABLE_LIST
      @note Inside views, a subquery in the @c FROM clause is not allowed.
      @note Do not use this field to separate views/base tables/anonymous
      derived tables. Use TABLE_LIST::is_anonymous_derived_table().
+     @note Names of items from st_select_list::item_list are saved in
+     original_names list. The latter are needed to restore the names of items
+     from item_list after each execution of the statement.
   */
   st_select_lex_unit *derived;		/* SELECT_LEX_UNIT of derived table */
   With_element *with;          /* With element defining this table (if any) */
+  List<Lex_ident_sys> *original_names;
+
   /* Bitmap of the defining with element */
   table_map with_internal_reference_map;
   TABLE_LIST * next_with_rec_ref;

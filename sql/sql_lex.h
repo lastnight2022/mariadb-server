@@ -1381,6 +1381,7 @@ public:
                               bool straight_fl);
   TABLE_LIST *convert_right_join();
   List<Item>* get_item_list();
+  void replace_item_list_names(List<Lex_ident_sys> *replace_names);
   ulong get_table_join_options();
   void set_lock_for_tables(thr_lock_type lock_type, bool for_update);
   /*

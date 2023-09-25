@@ -5848,4 +5848,175 @@ b	rank() over (order by c)
 -1	1
 drop view v1;
 drop table t1;
+#
+# MDEV-31995 CTE column name specification inconsistency
+#
+create table  folks(id int, name char(32), dob date, father int, mother int);
+insert into folks values
+(100, 'Me', '2000-01-01', 20, 30),
+(20, 'Dad', '1970-02-02', 10, 9),
+(30, 'Mom', '1975-03-03', 8, 7),
+(10, 'Grandpa Bill', '1940-04-05', null, null),
+(9, 'Grandma Ann', '1941-10-15', null, null),
+(25, 'Uncle Jim', '1968-11-18', 8, 7),
+(98, 'Sister Amy', '2001-06-20', 20, 30),
+(7, 'Grandma Sally', '1943-08-23', null, 6),
+(8, 'Grandpa Ben', '1940-10-21', null, null),
+(6, 'Grandgrandma Martha', '1923-05-17', null, null),
+(67, 'Cousin Eddie', '1992-02-28', 25, 27),
+(27, 'Auntie Melinda', '1971-03-29', null, null);
+with recursive
+ancestors(id,name,dob)
+as
+(
+with
+father(child_id,id,name,dob)
+as
+(
+select folks.id, f.id, f.name, f.dob as date_of_birth
+from folks, folks f
+where folks.father=f.id
+order by date_of_birth
+),
+mother(child_id,id,name,dob)
+as
+(
+select folks.id, m.id, m.name, m.dob as date_of_birth
+from folks, folks m
+where folks.mother=m.id
+order by date_of_birth
+)
+select folks.id, folks.name, folks.dob
+from folks
+where name='Me'
+  union
+select f.id, f.name, f.dob as date_of_birth
+from ancestors a, father f
+where f.child_id=a.id
+union
+select m.id, m.name, m.dob as date_of_birth
+from ancestors a, mother m
+where m.child_id=a.id
+)
+select ancestors.name, ancestors.dob from ancestors;
+name	dob
+Me	2000-01-01
+Dad	1970-02-02
+Mom	1975-03-03
+Grandpa Bill	1940-04-05
+Grandpa Ben	1940-10-21
+Grandma Ann	1941-10-15
+Grandma Sally	1943-08-23
+Grandgrandma Martha	1923-05-17
+prepare st from "with recursive
+ancestors(id,name,dob)
+as
+(
+with
+father(child_id,id,name,dob)
+as
+(
+select folks.id, f.id, f.name, f.dob as date_of_birth
+from folks, folks f
+where folks.father=f.id
+order by date_of_birth
+),
+mother(child_id,id,name,dob)
+as
+(
+select folks.id, m.id, m.name, m.dob as date_of_birth
+from folks, folks m
+where folks.mother=m.id
+order by date_of_birth
+)
+select folks.id, folks.name, folks.dob
+from folks
+where name='Me'
+  union
+select f.id, f.name, f.dob as date_of_birth
+from ancestors a, father f
+where f.child_id=a.id
+union
+select m.id, m.name, m.dob as date_of_birth
+from ancestors a, mother m
+where m.child_id=a.id
+)
+select ancestors.name, ancestors.dob from ancestors";
+execute st;
+name	dob
+Me	2000-01-01
+Dad	1970-02-02
+Mom	1975-03-03
+Grandpa Bill	1940-04-05
+Grandpa Ben	1940-10-21
+Grandma Ann	1941-10-15
+Grandma Sally	1943-08-23
+Grandgrandma Martha	1923-05-17
+execute st;
+name	dob
+Me	2000-01-01
+Dad	1970-02-02
+Mom	1975-03-03
+Grandpa Bill	1940-04-05
+Grandpa Ben	1940-10-21
+Grandma Ann	1941-10-15
+Grandma Sally	1943-08-23
+Grandgrandma Martha	1923-05-17
+drop prepare st;
+create procedure sp() with recursive
+ancestors(id,name,dob)
+as
+(
+with
+father(child_id,id,name,dob)
+as
+(
+select folks.id, f.id, f.name, f.dob as date_of_birth
+from folks, folks f
+where folks.father=f.id
+order by date_of_birth
+),
+mother(child_id,id,name,dob)
+as
+(
+select folks.id, m.id, m.name, m.dob as date_of_birth
+from folks, folks m
+where folks.mother=m.id
+order by date_of_birth
+)
+select folks.id, folks.name, folks.dob
+from folks
+where name='Me'
+  union
+select f.id, f.name, f.dob as date_of_birth
+from ancestors a, father f
+where f.child_id=a.id
+union
+select m.id, m.name, m.dob as date_of_birth
+from ancestors a, mother m
+where m.child_id=a.id
+)
+select ancestors.name, ancestors.dob from ancestors;
+call sp();
+name	dob
+Me	2000-01-01
+Dad	1970-02-02
+Mom	1975-03-03
+Grandpa Bill	1940-04-05
+Grandpa Ben	1940-10-21
+Grandma Ann	1941-10-15
+Grandma Sally	1943-08-23
+Grandgrandma Martha	1923-05-17
+call sp();
+name	dob
+Me	2000-01-01
+Dad	1970-02-02
+Mom	1975-03-03
+Grandpa Bill	1940-04-05
+Grandpa Ben	1940-10-21
+Grandma Ann	1941-10-15
+Grandma Sally	1943-08-23
+Grandgrandma Martha	1923-05-17
+drop procedure sp;
+drop table folks;
 # End of 10.4 tests

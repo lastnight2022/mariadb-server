@@ -545,4 +545,7 @@ void st_select_lex::set_with_clause(With_clause *with_clause)
     with_clause->set_owner(master_unit());
 }
 
+
+List<Lex_ident_sys> *allocate_and_save_item_names(THD *thd,
+                                                  List<Item> &item_list);
 #endif /* SQL_CTE_INCLUDED */

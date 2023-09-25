@@ -2973,6 +2973,27 @@ List<Item>* st_select_lex::get_item_list()
   return &item_list;
 }
 
+
+/**
+  @brief
+    Replace the name of each item in the item_list of this SELECT_LEX
+*/
+
+void st_select_lex::replace_item_list_names(List<Lex_ident_sys> *replacement)
+{
+  DBUG_ASSERT(item_list.elements == replacement->elements);
+
+  List_iterator_fast<Lex_ident_sys> it(*replacement);
+  Lex_ident_sys *new_name;
+
+  List_iterator_fast<Item> li(item_list);
+  Item *item;
+
+  while ((item= li++) && (new_name= it++))
+    lex_string_set( &item->name, new_name->str);
+}
+
+
 ulong st_select_lex::get_table_join_options()
 {
   return table_join_options;
