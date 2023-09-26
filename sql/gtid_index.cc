@@ -318,11 +318,19 @@ Gtid_index_base::~Gtid_index_base()
 
 
 void
+Gtid_index_base::make_gtid_index_file_name(char *out_name, size_t bufsize,
+                                           const char *base_filename)
+{
+  char *p= strmake(out_name, base_filename, bufsize-1);
+  size_t remain= bufsize - (p - out_name);
+  strmake(p, ".idx", remain-1);
+}
+
+
+void
 Gtid_index_base::build_index_filename(const char *filename)
 {
-  char *p= strmake(index_file_name, filename, sizeof(index_file_name)-1);
-  size_t remain= sizeof(index_file_name) - (p - index_file_name);
-  strmake(p, ".idx", remain-1);
+  make_gtid_index_file_name(index_file_name, sizeof(index_file_name), filename);
 }
 
 
