@@ -1261,14 +1261,16 @@ static int spider_send_query(
   DBUG_RETURN(0);
 }
 
+/*
+ Prepare and send query to data nodes and store the query results.
+*/
 int spider_group_by_handler::init_scan()
 {
   int error_num;
   DBUG_ENTER("spider_group_by_handler::init_scan");
   store_error = 0;
 #ifndef DBUG_OFF
-  Field **field;
-  for (field = table->field; *field; field++)
+  for (Field **field = table->field; *field; field++)
     DBUG_PRINT("info",("spider field_name=%s", SPIDER_field_name_str(*field)));
 #endif
 
@@ -1441,6 +1443,8 @@ group_by_handler *spider_create_group_by_handler(
     /* all tables are const_table */
     DBUG_RETURN(NULL);
   }
+
+  from = query->from;
   if (from->table->part_info)
   {
     partition_info *part_info = from->table->part_info;
@@ -1467,8 +1471,6 @@ group_by_handler *spider_create_group_by_handler(
   }
   while ((from = from->next_local))
   {
-    if (from->table->const_table)
-      continue;
     if (from->table->part_info)
     {
       partition_info *part_info = from->table->part_info;
@@ -1556,8 +1558,9 @@ group_by_handler *spider_create_group_by_handler(
       }
       if (keep_going)
       {
-        if (spider_dbton[roop_count].db_util->append_from_and_tables(
-          spider, fields_arg, NULL, query->from, table_idx))
+        if (spider->dbton_handler[roop_count]->append_join(
+              spider->wide_handler->trx->thd, fields_arg,
+              query->from->select_lex->join_list, NULL))
         {
           DBUG_PRINT("info",("spider dbton_id=%d can't create from", roop_count));
           spider_clear_bit(dbton_bitmap, roop_count);
@@ -1652,10 +1655,6 @@ group_by_handler *spider_create_group_by_handler(
   }
 
   from = query->from;
-  while (from->table->const_table)
-  {
-    from = from->next_local;
-  }
   if (from->table->part_info)
   {
     partition_info *part_info = from->table->part_info;
@@ -1733,8 +1732,6 @@ group_by_handler *spider_create_group_by_handler(
 
   while ((from = from->next_local))
   {
-    if (from->table->const_table)
-      continue;
     fields->clear_conn_holder_from_conn();
 
     if (from->table->part_info)

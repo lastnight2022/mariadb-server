@@ -158,47 +158,11 @@ public:
     spider_string *to,
     String *from
   ) override;
-  int append_table(
-    ha_spider *spider,
-    spider_fields *fields,
-    spider_string *str,
-    TABLE_LIST *table_list,
-    TABLE_LIST **used_table_list,
-    uint *current_pos,
-    TABLE_LIST **cond_table_list_ptr,
-    bool top_down,
-    bool first
-  );
-  int append_tables_top_down(
-    ha_spider *spider,
-    spider_fields *fields,
-    spider_string *str,
-    TABLE_LIST *table_list,
-    TABLE_LIST **used_table_list,
-    uint *current_pos,
-    TABLE_LIST **cond_table_list_ptr
-  );
   int append_tables_top_down_check(
     TABLE_LIST *table_list,
     TABLE_LIST **used_table_list,
     uint *current_pos
   );
-  int append_embedding_tables(
-    ha_spider *spider,
-    spider_fields *fields,
-    spider_string *str,
-    TABLE_LIST *table_list,
-    TABLE_LIST **used_table_list,
-    uint *current_pos,
-    TABLE_LIST **cond_table_list_ptr
-  );
-  int append_from_and_tables(
-    ha_spider *spider,
-    spider_fields *fields,
-    spider_string *str,
-    TABLE_LIST *table_list,
-    uint table_count
-  ) override;
   int append_where(
     spider_string *str
   ) override;
@@ -1480,6 +1444,12 @@ public:
     int link_idx,
     ulong sql_type
   );
+  void append_table_list(THD *thd, spider_fields *fields, TABLE_LIST *table,
+                         spider_string *str);
+  void append_table_array(THD *thd, spider_fields *fields, TABLE_LIST **table,
+                          TABLE_LIST **end, spider_string *str);
+  int append_join(THD *thd, spider_fields *fields, List<TABLE_LIST> *tables,
+                  spider_string *str);
   int append_from_and_tables_part(
     spider_fields *fields,
     ulong sql_type
