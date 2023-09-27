@@ -449,7 +449,9 @@ IF(CONNECT_WITH_JDBC AND JAVA_FOUND AND JNI_FOUND)
   get_target_property(_jarFile JdbcInterface JAR_FILE)
   INSTALL(FILES
     ${_jarFile} DESTINATION ${INSTALL_MYSQLSHAREDIR} COMPONENT connect-engine-jdbc)
-  SET(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} connect-engine-jdbc PARENT_SCOPE)
+  IF(CPACK_COMPONENTS_ALL)
+    SET(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} connect-engine-jdbc PARENT_SCOPE)
+  ENDIF()
   SET(CPACK_RPM_connect-engine-jdbc_PACKAGE_RECOMMENDS "MariaDB-connect-engine, mariadb-java-client, postgresql-jdbc, mysql-connector-java" PARENT_SCOPE)
   SET(CPACK_RPM_connect-engine-jdbc_PACKAGE_SUMMARY "Connect storage engine JDBC interface" PARENT_SCOPE)
   SET(CPACK_RPM_connect-engine-jdbc_PACKAGE_DESCRIPTION "Connect storage engine JDBC interface
