@@ -14367,52 +14367,60 @@ int spider_mbase_handler::reset_union_table_name(
   DBUG_RETURN(0);
 }
 
-void spider_mbase_handler::append_table_list(THD *thd,
-                                             spider_fields *fields,
-                                             TABLE_LIST *table,
-                                             spider_string *str)
+int spider_mbase_handler::append_table_list(THD *thd,
+                                            spider_fields *fields,
+                                            TABLE_LIST *table,
+                                            spider_string *str)
 {
   if (!str)
-    return;
+  {
+    if (table->nested_join)
+      return append_join(thd, fields, &table->nested_join->join_list, str);
+    return 0;
+  }
   if (table->nested_join)
   {
     str->append("(");
-    append_join(thd, fields, &table->nested_join->join_list, str);
+    if (int error_num= append_join(thd, fields, &table->nested_join->join_list, str))
+      return error_num;
     str->append(")");
-  } else                        /* fixme: assuming normal table for now */
-  {
-    SPIDER_TABLE_HOLDER *table_holder = fields->get_table_holder(table->table);
-    ha_spider *spd = table_holder->spider;
-    spider_mbase_share *db_share =
-      (spider_mbase_share *) spd->share->dbton_share[dbton_id];
-    spider_mbase_handler *dbton_hdl =
-      (spider_mbase_handler *) spd->dbton_handler[dbton_id];
-    if (table->table->const_table)
-      str->append(STRING_WITH_LEN(SPIDER_SQL_SELECT_1_STR));
-    else
-      db_share->append_table_name(
-        str, spd->conn_link_idx[dbton_hdl->first_link_idx]);
-    str->append(" ");
-    str->append(table_holder->alias->ptr(),
-                /* Don't append the trailing dot */
-                table_holder->alias->length() - 1);
+    return 0;
   }
+  /* fixme: assuming normal table for now */
+  SPIDER_TABLE_HOLDER *table_holder = fields->get_table_holder(table->table);
+  ha_spider *spd = table_holder->spider;
+  spider_mbase_share *db_share =
+    (spider_mbase_share *) spd->share->dbton_share[dbton_id];
+  spider_mbase_handler *dbton_hdl =
+    (spider_mbase_handler *) spd->dbton_handler[dbton_id];
+  if (table->table->const_table)
+    str->append(STRING_WITH_LEN(SPIDER_SQL_SELECT_1_STR));
+  else
+    if (int error_num= db_share->append_table_name(
+          str, spd->conn_link_idx[dbton_hdl->first_link_idx]))
+      return error_num;
+  str->append(" ");
+  str->append(table_holder->alias->ptr(),
+              /* Don't append the trailing dot */
+              table_holder->alias->length() - 1);
+  return 0;
 }
 
-void spider_mbase_handler::append_table_array(THD *thd,
+int spider_mbase_handler::append_table_array(THD *thd,
                                               spider_fields *fields,
                                               TABLE_LIST **table,
                                               TABLE_LIST **end,
                                               spider_string *str)
 {
-  append_table_list(thd, fields, *table, str);
-
-  for (TABLE_LIST **tbl= table + 1; tbl < end; tbl++)
+  if (str)
   {
-    TABLE_LIST *curr= *tbl;
+    if (int error_num= append_table_list(thd, fields, *table, str))
+      return error_num;
 
-    if (str)
+    for (TABLE_LIST **tbl= table + 1; tbl < end; tbl++)
     {
+      TABLE_LIST *curr= *tbl;
+
       /* JOIN_TYPE_OUTER is just a marker unrelated to real join */
       if (curr->outer_join & (JOIN_TYPE_LEFT|JOIN_TYPE_RIGHT))
       {
@@ -14421,26 +14429,47 @@ void spider_mbase_handler::append_table_array(THD *thd,
       }
       else if (curr->straight)
         str->append(STRING_WITH_LEN(" straight_join "));
+      /* semi join is unsupported */
       else if (curr->sj_inner_tables)
-        str->append(STRING_WITH_LEN(" semi join "));
+        return HA_ERR_UNSUPPORTED;
       else
         str->append(STRING_WITH_LEN(" join "));
-    }
 
-    append_table_list(thd, fields, curr, str);
-    // /* fixme: print on_expr */
-    if (curr->on_expr)
-    {
-      if (str)
+      if (int error_num= append_table_list(thd, fields, curr, str))
+        return error_num;
+
+      if (curr->on_expr)
+      {
         str->append(STRING_WITH_LEN(" on "));
-      spider_db_print_item_type(curr->on_expr, NULL, spider, str, NULL, 0,
-                                dbton_id, TRUE, fields);
-      /*
-        curr->on_expr->print(&str->str, QT_EXPLAIN);
-       */
-      // str->append("");
+        if (int error_num=
+            spider_db_print_item_type(curr->on_expr, NULL, spider, str,
+                                      NULL, 0, dbton_id, TRUE, fields))
+          return error_num;
+      }
     }
   }
+  else                        /* str == NULL */
+  {
+    if (int error_num= append_table_list(thd, fields, *table, str))
+      return error_num;
+    for (TABLE_LIST **tbl= table + 1; tbl < end; tbl++)
+    {
+      TABLE_LIST *curr= *tbl;
+      /* semi join is unsupported */
+      if (curr->sj_inner_tables)
+        return ER_SPIDER_COND_SKIP_NUM;
+      if (int error_num= append_table_list(thd, fields, curr, str))
+        return error_num;
+      if (curr->on_expr)
+      {
+        if (int error_num=
+            spider_db_print_item_type(curr->on_expr, NULL, spider, str, NULL,
+                                      0, dbton_id, TRUE, fields))
+          return error_num;
+      }
+    }
+  }
+  return 0;
 }
 
 int spider_mbase_handler::append_join(THD *thd, spider_fields *fields,
@@ -14458,14 +14487,15 @@ int spider_mbase_handler::append_join(THD *thd, spider_fields *fields,
     tables_to_print++;
   if (tables_to_print == 0)
   {
-    str->q_append(STRING_WITH_LEN("dual"));
+    if (str)
+      str->q_append(STRING_WITH_LEN("dual"));
     DBUG_RETURN(0);
   }
   ti.rewind();
 
   if (!(table= static_cast<TABLE_LIST **>(thd->alloc(sizeof(TABLE_LIST*) *
                                                      tables_to_print))))
-    DBUG_RETURN(1);                   // out of memory
+    DBUG_RETURN(HA_ERR_OUT_OF_MEM);         // out of memory
 
   TABLE_LIST *tmp, **t= table + (tables_to_print - 1);
   while ((tmp= ti++))
@@ -14490,8 +14520,9 @@ int spider_mbase_handler::append_join(THD *thd, spider_fields *fields,
       }
     }
   }
-  append_table_array(thd, fields, table, table + tables_to_print, str);
-  DBUG_RETURN(0);
+  int error_num= append_table_array(
+    thd, fields, table, table + tables_to_print, str);
+  DBUG_RETURN(error_num);
 }
 
 int spider_mbase_handler::append_from_and_tables_part(
