@@ -1445,11 +1445,11 @@ public:
     ulong sql_type
   );
   int append_table_list(THD *thd, spider_fields *fields, TABLE_LIST *table,
-                         spider_string *str);
+                        spider_string *str, uint *upper_usable_tables);
   int append_table_array(THD *thd, spider_fields *fields, TABLE_LIST **table,
-                          TABLE_LIST **end, spider_string *str);
+                         TABLE_LIST **end, spider_string *str, uint *upper_usable_tables);
   int append_join(THD *thd, spider_fields *fields, List<TABLE_LIST> *tables,
-                  spider_string *str);
+                  spider_string *str, uint *upper_usable_tables);
   int append_from_and_tables_part(
     spider_fields *fields,
     ulong sql_type

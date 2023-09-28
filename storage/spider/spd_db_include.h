@@ -1142,7 +1142,7 @@ public:
   virtual int init() = 0;
   virtual int append_join(THD *thd, spider_fields *fields,
                           List<TABLE_LIST> *tables,
-                          spider_string *str) = 0;
+                          spider_string *str, uint *upper_usable_tables) = 0;
   virtual int append_index_hint(
     spider_string *str,
     int link_idx,

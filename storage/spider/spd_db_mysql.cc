@@ -14370,18 +14370,22 @@ int spider_mbase_handler::reset_union_table_name(
 int spider_mbase_handler::append_table_list(THD *thd,
                                             spider_fields *fields,
                                             TABLE_LIST *table,
-                                            spider_string *str)
+                                            spider_string *str,
+                                            uint *upper_usable_tables)
 {
   if (!str)
   {
+    assert(upper_usable_tables);
     if (table->nested_join)
-      return append_join(thd, fields, &table->nested_join->join_list, str);
+      return append_join(thd, fields, &table->nested_join->join_list, str, upper_usable_tables);
+    *upper_usable_tables += table->table->map;
     return 0;
   }
+  assert(!upper_usable_tables);
   if (table->nested_join)
   {
     str->append("(");
-    if (int error_num= append_join(thd, fields, &table->nested_join->join_list, str))
+    if (int error_num= append_join(thd, fields, &table->nested_join->join_list, str, upper_usable_tables))
       return error_num;
     str->append(")");
     return 0;
@@ -14407,14 +14411,16 @@ int spider_mbase_handler::append_table_list(THD *thd,
 }
 
 int spider_mbase_handler::append_table_array(THD *thd,
-                                              spider_fields *fields,
-                                              TABLE_LIST **table,
-                                              TABLE_LIST **end,
-                                              spider_string *str)
+                                             spider_fields *fields,
+                                             TABLE_LIST **table,
+                                             TABLE_LIST **end,
+                                             spider_string *str,
+                                             uint *upper_usable_tables)
 {
   if (str)
   {
-    if (int error_num= append_table_list(thd, fields, *table, str))
+    assert(!upper_usable_tables);
+    if (int error_num= append_table_list(thd, fields, *table, str, NULL))
       return error_num;
 
     for (TABLE_LIST **tbl= table + 1; tbl < end; tbl++)
@@ -14435,7 +14441,7 @@ int spider_mbase_handler::append_table_array(THD *thd,
       else
         str->append(STRING_WITH_LEN(" join "));
 
-      if (int error_num= append_table_list(thd, fields, curr, str))
+      if (int error_num= append_table_list(thd, fields, curr, str, NULL))
         return error_num;
 
       if (curr->on_expr)
@@ -14450,7 +14456,9 @@ int spider_mbase_handler::append_table_array(THD *thd,
   }
   else                        /* str == NULL */
   {
-    if (int error_num= append_table_list(thd, fields, *table, str))
+    uint usable_tables= 0;
+    if (int error_num= append_table_list(thd, fields, *table, str,
+                                         &usable_tables))
       return error_num;
     for (TABLE_LIST **tbl= table + 1; tbl < end; tbl++)
     {
@@ -14458,23 +14466,32 @@ int spider_mbase_handler::append_table_array(THD *thd,
       /* semi join is unsupported */
       if (curr->sj_inner_tables)
         return ER_SPIDER_COND_SKIP_NUM;
-      if (int error_num= append_table_list(thd, fields, curr, str))
+      if (int error_num= append_table_list(thd, fields, curr, str,
+                                           &usable_tables))
         return error_num;
       if (curr->on_expr)
       {
+        /* This could avoid some broken queries where non-top-level
+          joins refers to outside fields. */
+        if ((curr->on_expr->used_tables() & usable_tables) !=
+            curr->on_expr->used_tables())
+          return ER_SPIDER_COND_SKIP_NUM;
         if (int error_num=
             spider_db_print_item_type(curr->on_expr, NULL, spider, str, NULL,
                                       0, dbton_id, TRUE, fields))
           return error_num;
       }
     }
+    if (upper_usable_tables)
+      *upper_usable_tables += usable_tables;
   }
   return 0;
 }
 
 int spider_mbase_handler::append_join(THD *thd, spider_fields *fields,
                                       List<TABLE_LIST> *tables,
-                                      spider_string *str)
+                                      spider_string *str,
+                                      uint *upper_usable_tables)
 {
   /* List is reversed => we should reverse it before using */
   List_iterator_fast<TABLE_LIST> ti(*tables);
@@ -14521,7 +14538,7 @@ int spider_mbase_handler::append_join(THD *thd, spider_fields *fields,
     }
   }
   int error_num= append_table_array(
-    thd, fields, table, table + tables_to_print, str);
+    thd, fields, table, table + tables_to_print, str, upper_usable_tables);
   DBUG_RETURN(error_num);
 }
 
@@ -14550,7 +14567,7 @@ int spider_mbase_handler::append_from_and_tables_part(
   table_name_pos = str->length();
   error_num = append_join(table_holder->spider->wide_handler->trx->thd,
                           fields,
-                          table_list->select_lex->join_list, str);
+                          table_list->select_lex->join_list, str, NULL);
   DBUG_RETURN(error_num);
 }
 

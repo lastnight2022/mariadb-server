@@ -1560,7 +1560,7 @@ group_by_handler *spider_create_group_by_handler(
       {
         if (spider->dbton_handler[roop_count]->append_join(
               spider->wide_handler->trx->thd, fields_arg,
-              query->from->select_lex->join_list, NULL))
+              query->from->select_lex->join_list, NULL, NULL))
         {
           DBUG_PRINT("info",("spider dbton_id=%d can't create from", roop_count));
           spider_clear_bit(dbton_bitmap, roop_count);
